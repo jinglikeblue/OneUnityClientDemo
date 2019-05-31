@@ -25,6 +25,9 @@ public class DemoMain : MonoBehaviour
         _client.onConnectSuccess += OnConnectSuccess;
         _client.onDisconnect += OnDisconnect;
         _client.onConnectFail += OnConnectFail;
+
+        inputIp.text = PlayerPrefs.GetString("ip", "127.0.0.1");
+        inputPort.text = PlayerPrefs.GetString("port", "1875");
     }
 
     private void Start()
@@ -57,8 +60,12 @@ public class DemoMain : MonoBehaviour
 
     public void ConnectServer()
     {
-        var ip = inputIp.text.Trim();
+        var ip = inputIp.text.Trim();        
         var port = int.Parse(inputPort.text.Trim());
+
+        PlayerPrefs.SetString("ip", ip);
+        PlayerPrefs.SetString("port", port.ToString());
+
         _client.Connect(ip, port, 4096);
     }
 
