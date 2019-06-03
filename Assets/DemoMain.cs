@@ -15,19 +15,52 @@ public class DemoMain : MonoBehaviour
     public Text text;
 
     List<string> _content = new List<string>();
-    BaseTcpProtocolProcess _pp;
+    
     TcpClient _client;
     ThreadSyncActions _tsa = new ThreadSyncActions();
 
     private void Awake()
     {
-        _client = new TcpClient(new BaseTcpProtocolProcess());
+        _client = new TcpClient();
         _client.onConnectSuccess += OnConnectSuccess;
         _client.onDisconnect += OnDisconnect;
         _client.onConnectFail += OnConnectFail;
+        _client.onReceiveData += OnReceiveData;
 
         inputIp.text = PlayerPrefs.GetString("ip", "127.0.0.1");
         inputPort.text = PlayerPrefs.GetString("port", "1875");
+    }
+
+    private void OnReceiveData(TcpClient arg1, byte[] arg2)
+    {
+        var ba = new ByteArray(arg2);
+        var last = ba.ReadString();
+        long now = DateTime.Now.ToFileTimeUtc();
+
+        var log = string.Format("[{0}] 收到消息:{1}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), last);
+        Log(log);
+
+        Send();
+    }
+
+    private void OnConnectFail(TcpClient obj)
+    {
+        var log = string.Format("连接失败：{0}", Thread.CurrentThread.ManagedThreadId);
+        Log(log);
+    }
+
+    private void OnDisconnect(TcpClient obj)
+    {
+        var log = string.Format("连接断开：{0}", Thread.CurrentThread.ManagedThreadId);
+        Log(log);
+    }
+
+    private void OnConnectSuccess(TcpClient obj)
+    {
+        var log = string.Format("连接成功：{0}", Thread.CurrentThread.ManagedThreadId);
+        Log(log);
+
+        Send();
     }
 
     private void Start()
@@ -47,12 +80,12 @@ public class DemoMain : MonoBehaviour
 
     IEnumerator NetCheck()
     {
-        _pp = _client.protocolProcess as BaseTcpProtocolProcess;
         while (true)
         {
+            _client.Refresh();
             if (_client.IsConnected)
             {
-                _pp.ReceiveProtocols(OnReceiveProtocol);
+                
             }
             yield return new WaitForSeconds(1f);
         }
@@ -71,10 +104,12 @@ public class DemoMain : MonoBehaviour
 
     void Send()
     {
-        BaseTcpProtocolBody obj = new BaseTcpProtocolBody();
-        obj.value = DateTime.Now.ToFileTimeUtc().ToString();
-        _client.Send(_pp.Pack(obj));
-        var log = string.Format("[{0}] 发送消息:{1}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), obj.value);
+        ByteArray ba = new ByteArray();
+        var value = DateTime.Now.ToFileTimeUtc().ToString();
+        ba.Write(value);
+        _client.Send(ba.GetAvailableBytes());
+
+        var log = string.Format("[{0}] 发送消息:{1}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), value);
         Log(log);
     }
 
@@ -95,46 +130,5 @@ public class DemoMain : MonoBehaviour
 
         text.text = sb.ToString();
     }
-
-    private void OnDisconnect(object sender, IRemoteProxy e)
-    {
-        _tsa.AddToSyncAction(() =>
-        {
-            var log = string.Format("连接断开：{0}", Thread.CurrentThread.ManagedThreadId);
-            Log(log);
-        });
-    }
-
-    private void OnReceiveProtocol(BaseTcpProtocolBody obj)
-    {
-        long last = long.Parse(obj.value);
-        long now = DateTime.Now.ToFileTimeUtc();
-
-        var log = string.Format("[{0}] 收到消息:{1}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), obj.value);
-        Log(log);
-
-        Send();
-    }
-
-    private void OnConnectSuccess(object sender, IRemoteProxy e)
-    {
-        _tsa.AddToSyncAction(() =>
-        {
-            var log = string.Format("连接成功：{0}", Thread.CurrentThread.ManagedThreadId);
-            Log(log);
-
-            Send();
-        });
-    }
-
-    private void OnConnectFail(object sender, IRemoteProxy e)
-    {
-        _tsa.AddToSyncAction(() =>
-        {
-            var log = string.Format("连接失败：{0}", Thread.CurrentThread.ManagedThreadId);
-            Log(log);
-        });
-    }
-
 
 }
